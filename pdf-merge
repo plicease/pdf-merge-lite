@@ -78,7 +78,7 @@ get '/pdf/merge/*pdf_list' => sub {
 
 } => 'pdf_merge';
 
-@ARGV = ('daemon', -l => 'http://127.0.0.1:3001') unless @ARGV > 0;
+@ARGV = ('daemon', -l => 'http://127.0.0.1:3001') if @ARGV == 0 && !$ENV{TEST_PDF_MERGE};
 app->secret(rand);
 app->start;
 
