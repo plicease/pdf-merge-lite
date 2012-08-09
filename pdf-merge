@@ -16,11 +16,6 @@ plugin 'RenderFile';
 my $pdf_directory = Path::Class::Dir->new( File::HomeDir->my_home, 'PDF' );
 my $tmp_directory = Path::Class::Dir->new( tempdir( CLEANUP => 1 ) );
 
-sub _count_pages
-{
-  PDF::API2->open(shift)->pages;
-}
-
 get '/' => sub {
   my($self) = @_;
   $self->redirect_to('pdf_list');
@@ -30,7 +25,7 @@ get '/pdf' => sub {
   my($self) = @_;
 
   my $id = 0;
-  my @pdfs = map { my $name = $_->basename; $name =~ s/\.pdf$//; { name => $name, id => $id++, page_count => _count_pages($_) } }
+  my @pdfs = map { my $name = $_->basename; $name =~ s/\.pdf$//; { name => $name, id => $id++, page_count => PDF::API2->open($_)->pages } }
              grep { (not $_->is_dir) and ($_->basename =~ /\.pdf$/) }
              $pdf_directory->children( no_hidden => 1 );
 
@@ -39,14 +34,29 @@ get '/pdf' => sub {
 
 get '/pdf/#filename.pdf' => sub {
   my($self) = @_;
-  my $filename = $self->param('filename');
-  $self->render_file(filepath => $pdf_directory->file("$filename.pdf"));
+  my $filename = $pdf_directory->file($self->param('filename') . '.pdf');
+  if(-f $filename && -r $filename)
+  {
+    $self->render_file(filepath => $filename);
+  }
+  else
+  {
+    $self->render_not_found;
+  }
 } => 'pdf_download';
 
 post '/pdf/merge' => sub {
   my($self) = @_;
   my @names = map { $self->param($_ . "_name") } grep /^pdf_\d+$/, $self->param;
-  $self->redirect_to('pdf_merge', pdf_list => join('/', @names) );
+  if(@names > 0)
+  {
+    $self->redirect_to('pdf_merge', pdf_list => join('/', @names) );
+  }
+  else
+  {
+    $self->flash(error => 'No PDFs specified for merge');
+    $self->redirect_to('pdf_list');
+  }
 } => 'pdf_merge_form';
 
 get '/pdf/merge/*pdf_list' => sub {
@@ -55,9 +65,9 @@ get '/pdf/merge/*pdf_list' => sub {
 
   my $dest_pdf = PDF::API2->new;
 
-  foreach my $source_pdf_filename (map { "$_.pdf" } grep !/^\./, @source_pdf_list)
+  foreach my $source_pdf_filename (map { $pdf_directory->file("$_.pdf") } grep !/^\./, @source_pdf_list)
   {
-    my $source_pdf = PDF::API2->open($pdf_directory->file($source_pdf_filename));
+    my $source_pdf = PDF::API2->open($source_pdf_filename);
     foreach my $page (1..$source_pdf->pages)
     {
       $dest_pdf->importpage($source_pdf, $page, $dest_pdf->page);
@@ -186,29 +196,6 @@ __DATA__
 
 [% END %]
 
-@@ layouts/default.html.ep
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Strict//EN">
-<html>
-  <head>
-    <title><%= title %></title>
-  </head>
-
-  <body>
-    <h1><%= title %></h1>
-
-% if(flash('message')) {
-      <p>!! <%= flash 'message' %> !!</p>
-% }
-
-    <%= content %>
-
-    <div id="footer">
-      &copy; 2012
-    </div>
-
-  </body>
-</html>
-
 @@ layouts/default.html.tt
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Strict//EN">
 <html>
@@ -219,8 +206,12 @@ __DATA__
   <body>
     <h1>[% title %]</h1>
 
+    [% IF h.flash('error') %]
+      <p>!! <span id="pdf_merge_error">[% h.flash('error') %]</span> !!</p>
+    [% END %]
+
     [% IF h.flash('message') %]
-      <p>!! [% h.flash('message') %] !!</p>
+      <p>!! <span id="pdf_merge_message">[% h.flash('message') %]</span> !!</p>
     [% END %]
 
     [% content %]
