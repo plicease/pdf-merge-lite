@@ -40,7 +40,7 @@ SEE ALSO
     Mojolicious::Plugin::RenderFile
 
 AUTHOR
-    Graham Ollis <plicease@wdlabs.com>
+    Graham Ollis <plicease@cpan.org>
 
 COPYRIGHT
     Copyright 2012 Graham Ollis

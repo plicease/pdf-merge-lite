@@ -145,7 +145,7 @@ L<Mojolicious::Plugin::RenderFile>
 
 =head1 AUTHOR
 
-Graham Ollis <plicease@wdlabs.com>
+Graham Ollis <plicease@cpan.org>
 
 =head1 COPYRIGHT
 
